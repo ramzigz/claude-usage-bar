@@ -250,3 +250,37 @@ test('each section spreads its parts over its share of the row, context taking o
     await ui.unmount()
   }
 })
+
+const usageText = (session: number, week: number) =>
+  `Current session: ${session}% used · resets Nov 9, 12:14pm (UTC)\nCurrent week (all models): ${week}% used · resets Nov 12, 2pm (UTC)\n`
+
+test('an interactive session reads /usage at start and every 2 minutes', async ($, on) => {
+  const clock = mock.clock(on, { now: NOW })
+  beneath(on)
+  const runs: (readonly string[])[] = []
+  let text = usageText(22, 76)
+  on('process.run', (_, e) => { runs.push(e.argv); return { value: { exitCode: 0, stdout: text, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } } })
+  on('session.usage', () => ({ value: { rateLimits: RATE_LIMITS, context: { tokens: 40_000, window: 400_000, percent: 10 } } }) as any)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await clock.advance(0)
+  const ui = await $.ui.mount({ ...band(200), surface: 'terminal' })
+  expect((await ui.find({ type: 'Box', key: '5h' }))?.text).toMatch(/ 22% ↻ 2h 14m$/)
+  expect((await ui.find({ type: 'Box', key: 'week' }))?.text).toMatch(/ 76% ↻ 3d 4h$/)
+  text = usageText(30, 77)
+  await clock.advance(120_000)
+  expect((await ui.find({ type: 'Box', key: '5h' }))?.text).toMatch(/ 30% ↻ 2h 12m$/)
+  expect(runs[0]).toEqual(['claude', '-p', '/usage', '--no-session-persistence'])
+  expect(runs.length).toBe(2)
+  await ui.unmount()
+})
+
+test('a non-interactive session never runs /usage', async ($, on) => {
+  const clock = mock.clock(on, { now: NOW })
+  beneath(on)
+  let runs = 0
+  on('process.run', () => { runs += 1; return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } } })
+  on('session.usage', () => ({ value: { rateLimits: RATE_LIMITS, context: { tokens: 40_000, window: 400_000, percent: 10 } } }) as any)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: false })
+  await clock.advance(240_000)
+  expect(runs).toBe(0)
+})

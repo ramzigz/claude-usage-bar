@@ -78,6 +78,23 @@ const contextFrom = async ($: UsageReader, live: SessionContextUsage): Promise<C
   return { tokens: breakdown?.totalTokens, window: window ?? live.window }
 }
 
+// /usage asks the server, so it also counts other sessions and claude.ai; a reply only reports this session's view.
+const USAGE_POLL = 2 * MINUTE
+const USAGE_ARGV = ['claude', '-p', '/usage', '--no-session-persistence']
+
+const usedPercent = (text: string, label: string) => {
+  const found = text.match(new RegExp(`^${label}: (\\d+(?:\\.\\d+)?)% used`, 'm'))
+  return found ? Number(found[1]) : undefined
+}
+
+// Keeps the reset times a reply gave: /usage writes them in local time.
+export const limitsFromUsage = (text: string, known: Limits): Limits | undefined => {
+  const fiveHour = usedPercent(text, 'Current session')
+  const sevenDay = usedPercent(text, 'Current week \\(all models\\)')
+  if (fiveHour === undefined && sevenDay === undefined) return undefined
+  return { ...known, fiveHour: fiveHour ?? known.fiveHour, sevenDay: sevenDay ?? known.sevenDay }
+}
+
 const isPast = (isoTime: string | undefined, now: number) => isoTime !== undefined && Date.parse(isoTime) <= now
 
 export const freshLimits = (stored: unknown, now: number): Limits => {
@@ -188,6 +205,19 @@ export const register: Register = (on, options) => {
     const stamp = async () => { const now = await $.clock.now(); await update($, tick, () => ({ now })) }
     await stamp()
     $.clock.every(MINUTE, () => { void stamp() })
+    // The /usage child is not interactive, so it never polls in turn.
+    if (e.isInteractive) {
+      const poll = async () => {
+        const result = await $.process.run(USAGE_ARGV, { timeoutMs: MINUTE }).catch(() => undefined)
+        if (result?.exitCode !== 0) return
+        const now = await $.clock.now()
+        let polled: Limits | undefined
+        await update($, limits, known => (polled = limitsFromUsage(result.stdout, freshLimits(known, now))) ?? known)
+        if (polled) await $.store.set('limits', polled).catch(() => {})
+      }
+      void poll()
+      $.clock.every(USAGE_POLL, () => { void poll() })
+    }
     return next(e)
   })
 
