@@ -144,3 +144,19 @@ test('a measurement with limits is stored for the next session', async ($, on) =
   await measure($, 10, [])
   expect(saved.limits).toMatchObject({ fiveHour: 18, sevenDay: 75 })
 })
+
+test('before the first response the ctx meter and Compact show the estimated fill', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  beneath(on)
+  on('session.usage', (_: unknown, e: any) => ({
+    value: { rateLimits: RATE_LIMITS, context: { window: 1_000_000, ...(e.breakdown ? { breakdown: { totalTokens: 94_000 } } : {}) } },
+  }) as any)
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.session.measure({ context: { window: 1_000_000 }, rateLimits: RATE_LIMITS, changed: ['rateLimits'] } as any)
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ ...band(200), surface })
+    expect((await ui.find({ type: 'Text', text: /^ctx / }))?.text).toMatch(/^ctx ▬* 9% 94K\/1M$/)
+    expect(await ui.find({ type: 'Button', label: 'Compact' })).toBeDefined()
+    await ui.unmount()
+  }
+})

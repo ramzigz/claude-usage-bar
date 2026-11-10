@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { PluginOptions, Register } from 'claude-code'
+import type { PluginOptions, Register, SessionContextUsage, SessionUsage, SessionUsageArgs } from 'claude-code'
 
 import type { Context, Limits, Tick } from '../types'
 
@@ -50,6 +50,14 @@ export const limitsFrom = (rateLimits: RateLimit[]): Limits => {
     fiveHourResetsAt: fiveHour?.resetsAt,
     sevenDayResetsAt: sevenDay?.resetsAt,
   }
+}
+
+type UsageReader = { session: { usage: (args?: SessionUsageArgs) => Promise<SessionUsage> } }
+
+const contextFrom = async ($: UsageReader, live: SessionContextUsage): Promise<Context> => {
+  if (live.tokens !== undefined || live.percent !== undefined) return { tokens: live.tokens, window: live.window, percent: live.percent }
+  const estimate = await $.session.usage({ breakdown: 'summary' }).then(usage => usage.context.breakdown?.totalTokens, () => undefined)
+  return { tokens: estimate, window: live.window }
 }
 
 const isPast = (isoTime: string | undefined, now: number) => isoTime !== undefined && Date.parse(isoTime) <= now
@@ -126,7 +134,8 @@ export const register: Register = (on, options) => {
     const usage = await $.session.usage()
     const known = usage.rateLimits.length ? limitsFrom(usage.rateLimits) : freshLimits(await $.store.get('limits').catch(() => undefined), await $.clock.now())
     await update($, limits, () => known)
-    await update($, context, () => ({ tokens: usage.context.tokens, window: usage.context.window, percent: usage.context.percent }))
+    const started = await contextFrom($, usage.context)
+    await update($, context, () => started)
     const stamp = async () => { const now = await $.clock.now(); await update($, tick, () => ({ now })) }
     await stamp()
     $.clock.every(MINUTE, () => { void stamp() })
@@ -139,9 +148,9 @@ export const register: Register = (on, options) => {
       await update($, limits, () => measured)
       await $.store.set('limits', measured).catch(() => {})
     }
-    const { tokens, window, percent } = e.context
-    await update($, context, () => ({ tokens, window, percent }))
-    const used = contextPercent({ tokens, window, percent })
+    const measured = await contextFrom($, e.context)
+    await update($, context, () => measured)
+    const used = contextPercent(measured)
     const isOver = used !== undefined && levelOf(used, thresholds.context) === 'over'
     if (isOver && !warnedOver) $.ui.toast(`Context is ${Math.round(used ?? 0)}% full: press Compact above the prompt`)
     warnedOver = isOver
