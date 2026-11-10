@@ -1,0 +1,15 @@
+{
+  "name": "usage-bar",
+  "version": "0.6.9",
+  "description": "Context, 5h and weekly usage as bars above the prompt, colored by how close each is to its limit, with a Compact button.",
+  "author": { "name": "ramzigz", "url": "https://github.com/ramzigz" },
+  "repository": "https://github.com/ramzigz/claude-usage-bar",
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "contextWarnPercent": { "type": "number", "title": "Context warning (%)", "description": "Context bar turns orange at this percent of the window.", "default": 50, "min": 1, "max": 100 },
+    "contextAlertPercent": { "type": "number", "title": "Context alert (%)", "description": "Context bar turns red, shows ⚠ and raises a toast at this percent.", "default": 80, "min": 1, "max": 100 },
+    "limitWarnPercent": { "type": "number", "title": "Usage limit warning (%)", "description": "5h and weekly bars turn orange at this percent.", "default": 70, "min": 1, "max": 100 },
+    "limitAlertPercent": { "type": "number", "title": "Usage limit alert (%)", "description": "5h and weekly bars turn red and show ⚠ at this percent.", "default": 90, "min": 1, "max": 100 }
+  }
+}
