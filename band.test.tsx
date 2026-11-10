@@ -102,3 +102,45 @@ test('the context toast shows once each time it crosses the alert mark', async (
     'Context is 82% full: press Compact above the prompt',
   ])
 })
+
+const resume = ($: any, on: any) => {
+  on('session.usage', () => ({ value: { rateLimits: [], context: { tokens: 94_000, window: 1_000_000, percent: 9 } } }) as any)
+  return $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+}
+
+test('a resumed session shows the last known limits before its first response', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  beneath(on)
+  mock.store(on, { limits: { fiveHour: 18, sevenDay: 75, fiveHourResetsAt: '2026-11-09T12:14:00Z', sevenDayResetsAt: '2026-11-12T14:00:00Z' } })
+  await resume($, on)
+  await measure($, 9, [])
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ ...band(200), surface })
+    expect((await ui.find({ type: 'Text', text: /^5h / }))?.text).toMatch(/^5h ▬+ 18% ↻ 2h 14m$/)
+    expect((await ui.find({ type: 'Text', text: /^week / }))?.text).toMatch(/^week ▬+ 75% ↻ 3d 4h$/)
+    await ui.unmount()
+  }
+})
+
+test('a stored window whose reset has passed is not shown', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  beneath(on)
+  mock.store(on, { limits: { fiveHour: 18, sevenDay: 75, fiveHourResetsAt: '2026-11-09T09:00:00Z', sevenDayResetsAt: '2026-11-12T14:00:00Z' } })
+  await resume($, on)
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ ...band(200), surface })
+    expect(await ui.find({ type: 'Text', text: /^5h / })).toBeUndefined()
+    expect((await ui.find({ type: 'Text', text: /^week / }))?.text).toMatch(/^week ▬+ 75%/)
+    await ui.unmount()
+  }
+})
+
+test('a measurement with limits is stored for the next session', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  beneath(on)
+  const saved: Record<string, unknown> = {}
+  on('store.set', (_: unknown, e: any) => { saved[e.key] = e.value; return { value: undefined } })
+  await measure($, 10)
+  await measure($, 10, [])
+  expect(saved.limits).toMatchObject({ fiveHour: 18, sevenDay: 75 })
+})

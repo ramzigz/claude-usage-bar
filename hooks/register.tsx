@@ -52,6 +52,20 @@ export const limitsFrom = (rateLimits: RateLimit[]): Limits => {
   }
 }
 
+const isPast = (isoTime: string | undefined, now: number) => isoTime !== undefined && Date.parse(isoTime) <= now
+
+export const freshLimits = (stored: unknown, now: number): Limits => {
+  const limits = (stored && typeof stored === 'object' ? stored : {}) as Limits
+  const fiveHourGone = isPast(limits.fiveHourResetsAt, now)
+  const sevenDayGone = isPast(limits.sevenDayResetsAt, now)
+  return {
+    fiveHour: fiveHourGone ? undefined : limits.fiveHour,
+    sevenDay: sevenDayGone ? undefined : limits.sevenDay,
+    fiveHourResetsAt: fiveHourGone ? undefined : limits.fiveHourResetsAt,
+    sevenDayResetsAt: sevenDayGone ? undefined : limits.sevenDayResetsAt,
+  }
+}
+
 export const untilLabel = (isoTime: string | undefined, now: number) => {
   const at = isoTime ? Date.parse(isoTime) : NaN
   if (Number.isNaN(at)) return ''
@@ -110,7 +124,8 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     const usage = await $.session.usage()
-    await update($, limits, () => limitsFrom(usage.rateLimits))
+    const known = usage.rateLimits.length ? limitsFrom(usage.rateLimits) : freshLimits(await $.store.get('limits').catch(() => undefined), await $.clock.now())
+    await update($, limits, () => known)
     await update($, context, () => ({ tokens: usage.context.tokens, window: usage.context.window, percent: usage.context.percent }))
     const stamp = async () => { const now = await $.clock.now(); await update($, tick, () => ({ now })) }
     await stamp()
@@ -119,7 +134,11 @@ export const register: Register = (on, options) => {
   })
 
   on('session.measure', async ($, e, next) => {
-    await update($, limits, () => limitsFrom(e.rateLimits))
+    if (e.rateLimits.length) {
+      const measured = limitsFrom(e.rateLimits)
+      await update($, limits, () => measured)
+      await $.store.set('limits', measured).catch(() => {})
+    }
     const { tokens, window, percent } = e.context
     await update($, context, () => ({ tokens, window, percent }))
     const used = contextPercent({ tokens, window, percent })
