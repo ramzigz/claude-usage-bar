@@ -25,6 +25,8 @@ In Claude Code, run:
 
 Then run `/reload-plugins`, or start a new session.
 
+If the install says "4 userConfig options not yet set", you can ignore it: the mod uses the defaults under [Settings](#settings) until you change them.
+
 To update later, run this in a shell, then `/reload-plugins`:
 
 ```
