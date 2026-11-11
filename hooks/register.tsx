@@ -80,7 +80,6 @@ const contextFrom = async ($: UsageReader, live: SessionContextUsage): Promise<C
 
 // /usage asks the server, so it also counts other sessions and claude.ai; a reply only reports this session's view.
 const USAGE_POLL = 2 * MINUTE
-const USAGE_ARGV = ['claude', '-p', '/usage', '--no-session-persistence']
 
 const usedPercent = (text: string, label: string) => {
   const found = text.match(new RegExp(`^${label}: (\\d+(?:\\.\\d+)?)% used`, 'm'))
@@ -208,7 +207,7 @@ export const register: Register = (on, options) => {
     // The /usage child is not interactive, so it never polls in turn.
     if (e.isInteractive) {
       const poll = async () => {
-        const result = await $.process.run(USAGE_ARGV, { timeoutMs: MINUTE }).catch(() => undefined)
+        const result = await $.process.run(['claude', '-p', '/usage', '--no-session-persistence'], { timeoutMs: MINUTE }).catch(() => undefined)
         if (result?.exitCode !== 0) return
         const now = await $.clock.now()
         let polled: Limits | undefined
