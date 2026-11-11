@@ -2,9 +2,7 @@
 
 A Claude Code mod that shows your context and usage limits as a one-line band above the prompt:
 
-```
-[Compact] context ▬▬▬▬▬▬ 42% 168K/400K │ 5h ▬▬▬▬▬▬ 18% ↻ 2h 14m │ week ▬▬▬▬▬▬ 31% ↻ 3d 4h
-```
+![The usage-bar band above the prompt](screenshot.png)
 
 - **context**: how full the context window is, with the token count, measured like `/context` against the window where compaction happens.
 - **5h** and **week**: how much of your 5-hour and weekly usage limits you've used, with a countdown to each reset. They refresh every 2 minutes from a background `claude -p /usage`, which uses no tokens, so they also count your other sessions and claude.ai.
