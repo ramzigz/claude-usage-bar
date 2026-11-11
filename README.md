@@ -46,6 +46,12 @@ echo '{"contextWarnPercent": "60"}' | claude plugin configure usage-bar@claude-u
 | Usage limit warning (%) | 70 | The 5h and week bars turn orange. |
 | Usage limit alert (%) | 90 | The 5h and week bars turn red with ⚠. |
 
+## What it runs and sends
+
+- **Program:** every 2 minutes, in interactive sessions only, the mod runs `claude -p /usage --no-session-persistence` with a one-minute timeout. It is the same Claude Code you are using, asking for the same numbers the `/usage` command shows: your 5-hour and weekly limits and when they reset. It uses no tokens, and `--no-session-persistence` keeps it out of your session list. This is the only program the mod runs.
+- **Command:** the Compact button runs `/compact` in the current session, only when you click it.
+- **Data:** the mod sends nothing anywhere itself. The `/usage` call goes to Anthropic, as `/usage` always does. The last limits it read are kept on your machine, in the plugin's own store, so a new session shows them right away.
+
 ## Development
 
 ```
