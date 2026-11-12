@@ -67,20 +67,17 @@ test('a narrow band swaps the bars for pies and keeps every window', async ($, o
   await desktop.unmount()
 })
 
-test('the VS Code panel draws the band as the terminal does, in a monospaced face', async ($, on) => {
-  mock.clock(on, { now: NOW })
-  beneath(on)
-  await measure($, 90)
+test('the VS Code panel draws pies at any width, packed to the left', async ($, on) => {
+  mock.clock(on, { now: NOW }); beneath(on); await measure($, 90)
   for (const columns of [200, 84, 55]) {
-    const terminal = await $.ui.mount({ ...band(columns), surface: 'terminal' })
-    const vscode = await $.ui.mount({ ...band(columns), surface: 'vscode' })
-    for (const key of ['ctx', '5h', 'week']) {
-      expect((await vscode.find({ type: 'Box', key }))?.text).toBe((await terminal.find({ type: 'Box', key }))?.text)
+    const ui = await $.ui.mount({ ...band(columns), surface: 'vscode' })
+    expect(await ui.find({ type: 'Svg' })).toBeDefined()
+    expect((await ui.findAll({ type: 'Text' })).some(text => text.text.includes('▬'))).toBe(false)
+    for (const key of ['5h', 'week']) {
+      const section = await ui.find({ type: 'Box', key })
+      if (section) expect(section.props).toMatchObject({ flexGrow: 0, justifyContent: 'flex-start' })
     }
-    expect(await vscode.find({ type: 'Svg' })).toBeUndefined()
-    expect((await vscode.findAll({ type: 'Text' })).every(text => text.props.mono)).toBe(true)
-    await terminal.unmount()
-    await vscode.unmount()
+    await ui.unmount()
   }
 })
 

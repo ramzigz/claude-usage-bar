@@ -259,16 +259,17 @@ export const register: Register = (on, options) => {
       meters.push({ key: 'week', label: 'week', percent: sevenDay, level: levelOf(sevenDay, thresholds.limit), reset: untilLabel(sevenDayResetsAt, now) })
     }
     const hasCompact = meters[0]?.key === 'ctx'
-    // The VS Code panel draws the terminal's band, in a monospaced face so the glyphs line up as they do there.
-    const asTerminal = e.surface === 'terminal' || e.surface === 'vscode'
-    const cells = asTerminal ? TERMINAL_CELLS : REMOTE_CELLS
-    const fitted = fitLayout(meters, hasCompact, e.props.bodyColumns, cells)
+    const cells = e.surface === 'terminal' ? TERMINAL_CELLS : REMOTE_CELLS
+    // The VS Code panel is always narrow: it draws pies only, packed to the left.
+    const packed = e.surface === 'vscode'
+    const fitted = packed
+      ? LAYOUTS.find(show => show.pie === 'all' && (!e.props.bodyColumns || bandWidth(meters, show, hasCompact, cells) <= e.props.bodyColumns)) ?? NARROWEST
+      : fitLayout(meters, hasCompact, e.props.bodyColumns, cells)
     const show = { ...fitted, bar: barLength(meters, fitted, hasCompact, e.props.bodyColumns, cells) }
 
     const elements = $.ui.resolve(e)
     const { Box, Button, Text } = elements
-    const mono = asTerminal || undefined
-    const Svg = !asTerminal && 'Svg' in elements ? elements.Svg : undefined
+    const Svg = e.surface !== 'terminal' && 'Svg' in elements ? elements.Svg : undefined
     const compact = async () => {
       try {
         await $.command.run({ command: 'compact' })
@@ -276,20 +277,20 @@ export const register: Register = (on, options) => {
         $.ui.toast(`Compact failed: ${err instanceof Error ? err.message : String(err)}`)
       }
     }
-    const spanViews = (spans: Span[]) => spans.map(({ text, dim, chart: _chart, ...style }) => <Text mono={mono} {...style} dimColor={dim}>{text}</Text>)
+    const spanViews = (spans: Span[]) => spans.map(({ text, dim, chart: _chart, ...style }) => <Text {...style} dimColor={dim}>{text}</Text>)
     const partView = (meter: Meter, spans: Span[]) => {
       const pie = spans.findIndex(span => span.chart === 'pie')
-      if (pie < 0 || !Svg) return <Box {...ROW} {...KEEP}><Text mono={mono} wrap="truncate-end">{spanViews(spans)}</Text></Box>
+      if (pie < 0 || !Svg) return <Box {...ROW} {...KEEP}><Text wrap="truncate-end">{spanViews(spans)}</Text></Box>
       return (
         <Box {...ROW} {...KEEP} alignItems="center">
-          <Text mono={mono} wrap="truncate-end">{spanViews(spans.slice(0, pie))}</Text>
+          <Text wrap="truncate-end">{spanViews(spans.slice(0, pie))}</Text>
           <Svg
             source={donutSvg(meter.percent, LEVEL_COLORS[meter.level])}
             alt={`${meter.label} ${Math.round(meter.percent)}%`}
             width={DONUT_SIZE}
             height={DONUT_SIZE}
           />
-          <Text mono={mono} wrap="truncate-end">{spanViews(spans.slice(pie + 1))}</Text>
+          <Text wrap="truncate-end">{spanViews(spans.slice(pie + 1))}</Text>
         </Box>
       )
     }
@@ -303,17 +304,17 @@ export const register: Register = (on, options) => {
     }
 
     return (
-      <Box {...ROW} justifyContent="space-between" gap={GAP} paddingX={PAD}>
+      <Box {...ROW} justifyContent={packed ? 'flex-start' : 'space-between'} gap={GAP} paddingX={PAD}>
         {shownMeters(meters, show).flatMap((meter, index, shown) => [
-          <Box key={meter.key} {...ROW} {...(meter.key === 'ctx' ? { flexShrink: 1, minWidth: 0 } : SHRINK)} flexGrow={meter.key === 'ctx' ? 0 : 1} justifyContent="space-between" alignItems="center" gap={1}>
+          <Box key={meter.key} {...ROW} {...(meter.key === 'ctx' ? { flexShrink: 1, minWidth: 0 } : SHRINK)} flexGrow={meter.key === 'ctx' || packed ? 0 : 1} justifyContent={packed ? 'flex-start' : 'space-between'} alignItems="center" gap={1}>
             {meter.key === 'ctx' && hasCompact ? (
               <Box {...ROW} flexShrink={0}>
-                <Button key="compact" label={COMPACT_LABEL} variant="primary" onPress={compact}><Text mono={mono} size="footnote" weight="medium">{COMPACT_LABEL}</Text></Button>
+                <Button key="compact" label={COMPACT_LABEL} variant="primary" onPress={compact}><Text size="footnote" weight="medium">{COMPACT_LABEL}</Text></Button>
               </Box>
             ) : null}
             {sectionParts(meter).map(part => partView(meter, part))}
           </Box>,
-          ...(index < shown.length - 1 ? [<Box {...ROW} flexShrink={0}><Text mono={mono} dimColor>{SEPARATOR}</Text></Box>] : []),
+          ...(index < shown.length - 1 ? [<Box {...ROW} flexShrink={0}><Text dimColor>{SEPARATOR}</Text></Box>] : []),
         ])}
       </Box>
     )
