@@ -306,7 +306,7 @@ export const register: Register = (on, options) => {
     return (
       <Box {...ROW} justifyContent={packed ? 'flex-start' : 'space-between'} gap={GAP} paddingX={PAD}>
         {shownMeters(meters, show).flatMap((meter, index, shown) => [
-          <Box key={meter.key} {...ROW} {...(meter.key === 'ctx' ? { flexShrink: 1, minWidth: 0 } : SHRINK)} flexGrow={meter.key === 'ctx' || packed ? 0 : 1} justifyContent={packed ? 'flex-start' : 'space-between'} alignItems="center" gap={packed ? 0 : 1}>
+          <Box key={meter.key} {...ROW} {...(meter.key === 'ctx' ? { flexShrink: 1, minWidth: 0 } : SHRINK)} flexGrow={meter.key === 'ctx' || packed ? 0 : 1} justifyContent={packed ? 'flex-start' : 'space-between'} alignItems="center" gap={packed && meter.key !== 'ctx' ? 0 : 1}>
             {meter.key === 'ctx' && hasCompact ? (
               <Box {...ROW} flexShrink={0}>
                 <Button key="compact" label={COMPACT_LABEL} variant="primary" onPress={compact}><Text size="footnote" weight="medium">{COMPACT_LABEL}</Text></Button>
