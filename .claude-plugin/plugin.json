@@ -1,6 +1,6 @@
 {
   "name": "usage-bar",
-  "version": "0.6.19",
+  "version": "0.6.20",
   "description": "Context, 5h and weekly usage as bars above the prompt, colored by how close each is to its limit, with a Compact button.",
   "author": { "name": "ramzigz", "url": "https://github.com/ramzigz" },
   "repository": "https://github.com/ramzigz/claude-usage-bar",

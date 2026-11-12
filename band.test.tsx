@@ -67,9 +67,19 @@ test('a narrow band swaps the bars for pies and keeps every window', async ($, o
   await desktop.unmount()
 })
 
-test('the VS Code panel draws box bars that fill the row at any width', async ($, on) => {
+test('the VS Code panel turns its bars to donuts before dropping the resets', async ($, on) => {
   mock.clock(on, { now: NOW }); beneath(on); await measure($, 90)
-  for (const columns of [200, 84, 55, 20]) {
+  for (const [columns, pies, reset] of [[56, 3, true], [50, 3, false]] as const) {
+    const ui = await $.ui.mount({ ...band(columns), surface: 'vscode' })
+    expect((await ui.findAll({ type: 'Svg' })).length).toBe(pies)
+    expect(!!(await ui.find({ type: 'Text', text: /↻/ }))).toBe(reset)
+    await ui.unmount()
+  }
+})
+
+test('the VS Code panel draws box bars that fill the row while they fit with the resets', async ($, on) => {
+  mock.clock(on, { now: NOW }); beneath(on); await measure($, 90)
+  for (const columns of [200, 84, 62]) {
     const ui = await $.ui.mount({ ...band(columns), surface: 'vscode' })
     expect(await ui.find({ type: 'Svg' })).toBeUndefined()
     expect((await ui.findAll({ type: 'Text' })).some(text => text.text.includes('▬'))).toBe(false)

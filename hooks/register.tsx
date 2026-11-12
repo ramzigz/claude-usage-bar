@@ -143,8 +143,9 @@ export const LAYOUTS: Show[] = [
   { ...THREE_PIES, hide: 'week', ctxLabel: 'ctx' },
   NARROWEST,
 ]
-// The panel keeps bars at every width, dropping the same parts in the same order.
-const PANEL_LAYOUTS: Show[] = LAYOUTS.map(show => ({ ...show, pie: 'none', bar: PANEL_BAR }))
+// The panel keeps its bars with the resets, then turns them to donuts before the resets go.
+const PANEL_LAYOUTS: Show[] = [{ detail: true, reset: true, pie: 'none' }, { detail: false, reset: true, pie: 'none' }, ...LAYOUTS.slice(1)]
+  .map(show => ({ ...show, bar: PANEL_BAR }))
 export const shownMeters = (meters: Meter[], show: Show) => meters.filter(meter => meter.key !== show.hide)
 
 // The band never wraps and no part is cut to "…": a section that still overflows is clipped at its edge.
