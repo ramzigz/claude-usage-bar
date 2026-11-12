@@ -67,6 +67,23 @@ test('a narrow band swaps the bars for pies and keeps every window', async ($, o
   await desktop.unmount()
 })
 
+test('the VS Code panel draws the band as the terminal does, in a monospaced face', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  beneath(on)
+  await measure($, 90)
+  for (const columns of [200, 84, 55]) {
+    const terminal = await $.ui.mount({ ...band(columns), surface: 'terminal' })
+    const vscode = await $.ui.mount({ ...band(columns), surface: 'vscode' })
+    for (const key of ['ctx', '5h', 'week']) {
+      expect((await vscode.find({ type: 'Box', key }))?.text).toBe((await terminal.find({ type: 'Box', key }))?.text)
+    }
+    expect(await vscode.find({ type: 'Svg' })).toBeUndefined()
+    expect((await vscode.findAll({ type: 'Text' })).every(text => text.props.mono)).toBe(true)
+    await terminal.unmount()
+    await vscode.unmount()
+  }
+})
+
 test('the smallest band drops week, then shortens context to ctx, then drops its label, keeping Compact and the 5h pie', async ($, on) => {
   mock.clock(on, { now: NOW })
   beneath(on)
