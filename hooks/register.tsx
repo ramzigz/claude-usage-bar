@@ -126,7 +126,10 @@ const TERMINAL_CELLS: Cells = { text: 1, bar: 1, pie: 1, compact: 12, part: 1 }
 // Measured on the desktop: a cell is about 7.9px, a letter about 7px, a ▬ and the donut about 14px, Compact with its gap about 86px.
 const REMOTE_CELLS: Cells = { text: 0.9, bar: 1.8, pie: 1.8, compact: 11, part: 1 }
 // Measured in Cursor: a cell (a "0" in the panel's font) is about 9.5px, a letter about 6.75px, the donut about 14px, Compact with its gap about 76px; parts sit with no gap.
-const PANEL_CELLS: Cells = { text: 0.72, bar: 1.8, pie: 1.5, compact: 8, part: 0 }
+// The panel's bars are boxes a cell per unit, drawn at least PANEL_BAR wide and stretched over the spare width.
+const PANEL_CELLS: Cells = { text: 0.72, bar: 1, pie: 1.5, compact: 8, part: 0 }
+const PANEL_BAR = 4
+const BAR_TRACK = '#80808055'
 
 const THREE_PIES: Show = { detail: false, reset: false, pie: 'all' }
 // Narrower still: week goes, then context shortens to ctx, then loses its label, leaving Compact and the two pies.
@@ -140,6 +143,8 @@ export const LAYOUTS: Show[] = [
   { ...THREE_PIES, hide: 'week', ctxLabel: 'ctx' },
   NARROWEST,
 ]
+// The panel keeps bars at every width, dropping the same parts in the same order.
+const PANEL_LAYOUTS: Show[] = LAYOUTS.map(show => ({ ...show, pie: 'none', bar: PANEL_BAR }))
 export const shownMeters = (meters: Meter[], show: Show) => meters.filter(meter => meter.key !== show.hide)
 
 // The band never wraps and no part is cut to "…": a section that still overflows is clipped at its edge.
@@ -262,12 +267,12 @@ export const register: Register = (on, options) => {
     }
     const hasCompact = meters[0]?.key === 'ctx'
     const cells = e.surface === 'terminal' ? TERMINAL_CELLS : e.surface === 'vscode' ? PANEL_CELLS : REMOTE_CELLS
-    // The VS Code panel is always narrow: it draws pies only, packed to the left.
+    // The VS Code panel draws box bars that stretch over the row, its parts packed to the left.
     const packed = e.surface === 'vscode'
     const fitted = packed
-      ? LAYOUTS.find(show => show.pie === 'all' && (!e.props.bodyColumns || bandWidth(meters, show, hasCompact, cells) <= e.props.bodyColumns)) ?? NARROWEST
+      ? PANEL_LAYOUTS.find(show => !e.props.bodyColumns || bandWidth(meters, show, hasCompact, cells) <= e.props.bodyColumns) ?? PANEL_LAYOUTS[PANEL_LAYOUTS.length - 1]
       : fitLayout(meters, hasCompact, e.props.bodyColumns, cells)
-    const show = { ...fitted, bar: barLength(meters, fitted, hasCompact, e.props.bodyColumns, cells) }
+    const show = packed ? fitted : { ...fitted, bar: barLength(meters, fitted, hasCompact, e.props.bodyColumns, cells) }
 
     const elements = $.ui.resolve(e)
     const { Box, Button, Text } = elements
@@ -281,6 +286,18 @@ export const register: Register = (on, options) => {
     }
     const spanViews = (spans: Span[]) => spans.map(({ text, dim, chart: _chart, ...style }) => <Text {...style} dimColor={dim}>{text}</Text>)
     const partView = (meter: Meter, spans: Span[]) => {
+      const bar = spans.findIndex(span => span.chart === 'bar')
+      if (packed && bar >= 0) {
+        return (
+          <Box {...ROW} flexGrow={1} flexShrink={1} minWidth={0} alignItems="center">
+            <Text wrap="truncate-end">{spanViews(spans.slice(0, bar))}</Text>
+            <Box flexGrow={1} minWidth={PANEL_BAR} height={0.35} backgroundColor={BAR_TRACK} overflow="hidden">
+              <Box width={`${Math.round(clamp(meter.percent))}%`} height="100%" backgroundColor={LEVEL_COLORS[meter.level]} />
+            </Box>
+            <Text wrap="truncate-end">{spanViews(spans.slice(bar + 2))}</Text>
+          </Box>
+        )
+      }
       const pie = spans.findIndex(span => span.chart === 'pie')
       if (pie < 0 || !Svg) return <Box {...ROW} {...KEEP}><Text wrap="truncate-end">{spanViews(spans)}</Text></Box>
       return (
@@ -308,7 +325,7 @@ export const register: Register = (on, options) => {
     return (
       <Box {...ROW} justifyContent={packed ? 'flex-start' : 'space-between'} gap={GAP} paddingX={PAD}>
         {shownMeters(meters, show).flatMap((meter, index, shown) => [
-          <Box key={meter.key} {...ROW} {...(meter.key === 'ctx' ? { flexShrink: 1, minWidth: 0 } : SHRINK)} flexGrow={meter.key === 'ctx' || packed ? 0 : 1} justifyContent={packed ? 'flex-start' : 'space-between'} alignItems="center" gap={packed && meter.key !== 'ctx' ? 0 : 1}>
+          <Box key={meter.key} {...ROW} {...(meter.key === 'ctx' ? { flexShrink: 1, minWidth: 0 } : SHRINK)} flexGrow={packed ? 1 : meter.key === 'ctx' ? 0 : 1} justifyContent={packed ? 'flex-start' : 'space-between'} alignItems="center" gap={packed && meter.key !== 'ctx' ? 0 : 1}>
             {meter.key === 'ctx' && hasCompact ? (
               <Box {...ROW} flexShrink={0}>
                 <Button key="compact" label={COMPACT_LABEL} variant="primary" onPress={compact}><Text size="footnote" weight="medium">{COMPACT_LABEL}</Text></Button>

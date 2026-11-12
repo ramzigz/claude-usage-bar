@@ -67,15 +67,16 @@ test('a narrow band swaps the bars for pies and keeps every window', async ($, o
   await desktop.unmount()
 })
 
-test('the VS Code panel draws pies at any width, packed to the left', async ($, on) => {
+test('the VS Code panel draws box bars that fill the row at any width', async ($, on) => {
   mock.clock(on, { now: NOW }); beneath(on); await measure($, 90)
-  for (const columns of [200, 84, 55]) {
+  for (const columns of [200, 84, 55, 20]) {
     const ui = await $.ui.mount({ ...band(columns), surface: 'vscode' })
-    expect(await ui.find({ type: 'Svg' })).toBeDefined()
+    expect(await ui.find({ type: 'Svg' })).toBeUndefined()
     expect((await ui.findAll({ type: 'Text' })).some(text => text.text.includes('▬'))).toBe(false)
+    expect((await ui.findAll({ type: 'Box' })).map(box => box.props.width).filter(Boolean)).toContain('90%')
     for (const key of ['5h', 'week']) {
       const section = await ui.find({ type: 'Box', key })
-      if (section) expect(section.props).toMatchObject({ flexGrow: 0, justifyContent: 'flex-start', gap: 0 })
+      if (section) expect(section.props).toMatchObject({ flexGrow: 1, justifyContent: 'flex-start', gap: 0 })
     }
     const context = await ui.find({ type: 'Box', key: 'ctx' })
     if (context) expect(context.props).toMatchObject({ gap: 1 })
@@ -85,10 +86,10 @@ test('the VS Code panel draws pies at any width, packed to the left', async ($, 
 
 test('the VS Code panel keeps resets and labels while they fit its measured cells', async ($, on) => {
   mock.clock(on, { now: NOW }); beneath(on); await measure($, 90)
-  const wide = await $.ui.mount({ ...band(56), surface: 'vscode' })
+  const wide = await $.ui.mount({ ...band(64), surface: 'vscode' })
   expect(await wide.find({ type: 'Text', text: /↻/ })).toBeDefined()
   await wide.unmount()
-  const narrow = await $.ui.mount({ ...band(32), surface: 'vscode' })
+  const narrow = await $.ui.mount({ ...band(40), surface: 'vscode' })
   expect((await narrow.find({ type: 'Box', key: 'ctx' }))?.text).toContain('context')
   expect(await narrow.find({ type: 'Box', key: '5h' })).toBeDefined()
   await narrow.unmount()
