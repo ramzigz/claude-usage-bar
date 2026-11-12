@@ -75,7 +75,7 @@ test('the VS Code panel draws pies at any width, packed to the left', async ($, 
     expect((await ui.findAll({ type: 'Text' })).some(text => text.text.includes('▬'))).toBe(false)
     for (const key of ['5h', 'week']) {
       const section = await ui.find({ type: 'Box', key })
-      if (section) expect(section.props).toMatchObject({ flexGrow: 0, justifyContent: 'flex-start' })
+      if (section) expect(section.props).toMatchObject({ flexGrow: 0, justifyContent: 'flex-start', gap: 0 })
     }
     await ui.unmount()
   }
