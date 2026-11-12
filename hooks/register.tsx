@@ -120,11 +120,13 @@ export const untilLabel = (isoTime: string | undefined, now: number) => {
 export type Meter = { key: string; label: string; percent: number; level: Level; detail?: string; reset?: string }
 export type Show = { detail: boolean; reset: boolean; pie: 'none' | 'ctx' | 'all'; bar?: number; hide?: string; ctxLabel?: string }
 type Span = { text: string; color?: string; dim?: boolean; bold?: boolean; chart?: 'bar' | 'pie' }
-export type Cells = { text: number; bar: number; pie: number; compact: number }
+export type Cells = { text: number; bar: number; pie: number; compact: number; part: number }
 
-const TERMINAL_CELLS: Cells = { text: 1, bar: 1, pie: 1, compact: 12 }
+const TERMINAL_CELLS: Cells = { text: 1, bar: 1, pie: 1, compact: 12, part: 1 }
 // Measured on the desktop: a cell is about 7.9px, a letter about 7px, a ▬ and the donut about 14px, Compact with its gap about 86px.
-const REMOTE_CELLS: Cells = { text: 0.9, bar: 1.8, pie: 1.8, compact: 11 }
+const REMOTE_CELLS: Cells = { text: 0.9, bar: 1.8, pie: 1.8, compact: 11, part: 1 }
+// Measured in Cursor: a cell (a "0" in the panel's font) is about 9.5px, a letter about 6.75px, the donut about 14px, Compact with its gap about 76px; parts sit with no gap.
+const PANEL_CELLS: Cells = { text: 0.72, bar: 1.8, pie: 1.5, compact: 8, part: 0 }
 
 const THREE_PIES: Show = { detail: false, reset: false, pie: 'all' }
 // Narrower still: week goes, then context shortens to ctx, then loses its label, leaving Compact and the two pies.
@@ -175,7 +177,7 @@ export const bandWidth = (all: Meter[], show: Show, hasCompact: boolean, cells: 
   const between = Math.max(meters.length - 1, 0)
   // A limit's label, chart and reset are parts of their own, a cell apart.
   const parts = meters.reduce((sum, meter) => sum + (meter.key === 'ctx' ? 0 : show.reset && meter.reset ? 2 : 1), 0)
-  return text + parts + between * (GAP + SEPARATOR.length + GAP) + (hasCompact ? cells.compact : 0) + 2 * PAD
+  return text + parts * cells.part + between * (GAP + SEPARATOR.length + GAP) + (hasCompact ? cells.compact : 0) + 2 * PAD
 }
 
 export const fitLayout = (meters: Meter[], hasCompact: boolean, columns: number | undefined, cells: Cells = TERMINAL_CELLS) =>
@@ -259,7 +261,7 @@ export const register: Register = (on, options) => {
       meters.push({ key: 'week', label: 'week', percent: sevenDay, level: levelOf(sevenDay, thresholds.limit), reset: untilLabel(sevenDayResetsAt, now) })
     }
     const hasCompact = meters[0]?.key === 'ctx'
-    const cells = e.surface === 'terminal' ? TERMINAL_CELLS : REMOTE_CELLS
+    const cells = e.surface === 'terminal' ? TERMINAL_CELLS : e.surface === 'vscode' ? PANEL_CELLS : REMOTE_CELLS
     // The VS Code panel is always narrow: it draws pies only, packed to the left.
     const packed = e.surface === 'vscode'
     const fitted = packed

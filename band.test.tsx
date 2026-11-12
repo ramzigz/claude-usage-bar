@@ -83,6 +83,17 @@ test('the VS Code panel draws pies at any width, packed to the left', async ($, 
   }
 })
 
+test('the VS Code panel keeps resets and labels while they fit its measured cells', async ($, on) => {
+  mock.clock(on, { now: NOW }); beneath(on); await measure($, 90)
+  const wide = await $.ui.mount({ ...band(56), surface: 'vscode' })
+  expect(await wide.find({ type: 'Text', text: /↻/ })).toBeDefined()
+  await wide.unmount()
+  const narrow = await $.ui.mount({ ...band(32), surface: 'vscode' })
+  expect((await narrow.find({ type: 'Box', key: 'ctx' }))?.text).toContain('context')
+  expect(await narrow.find({ type: 'Box', key: '5h' })).toBeDefined()
+  await narrow.unmount()
+})
+
 test('the smallest band drops week, then shortens context to ctx, then drops its label, keeping Compact and the 5h pie', async ($, on) => {
   mock.clock(on, { now: NOW })
   beneath(on)
